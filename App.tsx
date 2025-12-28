@@ -130,11 +130,11 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-slate-900 selection:bg-red-100">
+    <div className="min-h-screen bg-[#fafafa] text-slate-900 selection:bg-red-100 flex flex-col">
       <header className="bg-white border-b border-slate-100 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 sm:h-20 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="text-red-900 font-bold text-xl sm:text-2xl tracking-tighter serif">
+            <div className="text-red-900 font-bold text-lg sm:text-2xl tracking-tighter serif">
               LEX<span className="text-slate-300">.</span>
             </div>
             <div className="h-4 w-[1px] bg-slate-200 hidden sm:block"></div>
@@ -150,7 +150,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-32">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-12 pb-24 w-full">
         <section className="mb-8 sm:mb-12 relative">
           <form onSubmit={handleTranslate} className="relative group">
             <input
@@ -164,12 +164,12 @@ const App: React.FC = () => {
               onFocus={() => query && setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder={`Search in ${LANGUAGE_NAMES[sourceLang]}...`}
-              className="w-full bg-white border border-slate-200 px-4 sm:px-6 py-4 sm:py-6 rounded-none focus:border-red-900 transition-all text-xl sm:text-2xl serif outline-none shadow-sm group-hover:shadow-md"
+              className="w-full bg-white border border-slate-200 pl-4 pr-12 sm:pl-6 sm:pr-16 py-3.5 sm:py-6 rounded-none focus:border-red-900 transition-all text-lg sm:text-2xl serif outline-none shadow-sm group-hover:shadow-md"
             />
             <button
               type="submit"
               disabled={isLoading || !query.trim()}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-red-900 p-2 hover:bg-red-50 transition-colors disabled:opacity-30"
+              className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 text-red-900 p-2 hover:bg-red-50 transition-colors disabled:opacity-30"
             >
               {isLoading ? (
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-red-900/20 border-t-red-900 rounded-full animate-spin" />
@@ -185,7 +185,7 @@ const App: React.FC = () => {
             <div className="absolute top-full left-0 right-0 bg-white border-x border-b border-slate-100 shadow-2xl z-50 overflow-hidden divide-y divide-slate-50">
               {visibleHistory.length > 0 && (
                 <div className="bg-slate-50/50">
-                  <div className="px-4 sm:px-6 py-2 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">History</div>
+                  <div className="px-4 sm:px-6 py-1.5 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">History</div>
                   {visibleHistory.map((s, i) => (
                     <button
                       key={`hist-${i}`}
@@ -193,17 +193,17 @@ const App: React.FC = () => {
                       onClick={() => { setQuery(s); handleTranslate(undefined, s); }}
                       className="w-full text-left px-4 sm:px-6 py-2.5 sm:py-3 hover:bg-white transition-colors flex items-center gap-3"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span className="text-slate-600 serif text-sm sm:text-base">{s}</span>
+                      <span className="text-slate-600 serif text-sm sm:text-base truncate">{s}</span>
                     </button>
                   ))}
                 </div>
               )}
               {visibleCommon.length > 0 && (
                 <div>
-                  <div className="px-4 sm:px-6 py-2 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Common</div>
+                  <div className="px-4 sm:px-6 py-1.5 text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Common</div>
                   {visibleCommon.map((s, i) => (
                     <button
                       key={`comm-${i}`}
@@ -211,10 +211,10 @@ const App: React.FC = () => {
                       onClick={() => { setQuery(s); handleTranslate(undefined, s); }}
                       className="w-full text-left px-4 sm:px-6 py-2.5 sm:py-3 hover:bg-slate-50 transition-colors flex items-center gap-3"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                       </svg>
-                      <span className="text-slate-600 serif text-sm sm:text-base">{s}</span>
+                      <span className="text-slate-600 serif text-sm sm:text-base truncate">{s}</span>
                     </button>
                   ))}
                 </div>
@@ -224,12 +224,12 @@ const App: React.FC = () => {
         </section>
 
         {result && !isLoading && (
-          <div className="animate-in fade-in duration-700 slide-in-from-bottom-4">
-            <div className="bg-white border border-slate-100 p-6 sm:p-12 mb-8 sm:mb-12 shadow-sm relative">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-8 sm:gap-12 mb-8 sm:mb-12">
-                <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-1">
-                    <h2 className="text-3xl sm:text-5xl font-bold serif text-slate-900 tracking-tight break-words">{result.term}</h2>
+          <div className="animate-in fade-in duration-500 slide-in-from-bottom-2">
+            <div className="bg-white border border-slate-100 p-5 sm:p-10 md:p-12 mb-8 shadow-sm relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-8 mb-10">
+                <div className="flex-1 w-full">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold serif text-slate-900 tracking-tight leading-tight break-words">{result.term}</h2>
                     <button 
                       onClick={() => handleSpeak(result.term, sourceLang)}
                       className="p-1.5 text-slate-300 hover:text-red-900 transition-colors flex-shrink-0"
@@ -241,25 +241,25 @@ const App: React.FC = () => {
                     </button>
                   </div>
                   {result.termPhonetic && (
-                    <div className="text-slate-400 text-xs sm:text-sm font-medium mb-3 sm:mb-4 font-mono">[{result.termPhonetic}]</div>
+                    <div className="text-slate-400 text-[11px] sm:text-sm font-medium mb-3 font-mono tracking-tight break-all">[{result.termPhonetic}]</div>
                   )}
                   {result.grammar && (
-                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1">
+                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.15em] text-slate-400 font-bold flex flex-wrap gap-x-2 sm:gap-x-4 gap-y-1.5 mt-2">
                       <span className="bg-slate-100 px-2 py-0.5 text-slate-600 rounded-sm">{result.grammar.partOfSpeech}</span>
-                      {result.grammar.gender && <span className="text-red-900">Gender: {result.grammar.gender}</span>}
-                      {result.grammar.plural && <span>Plural: {result.grammar.plural}</span>}
-                      {result.level && <span className="text-red-900">Level: {result.level}</span>}
+                      {result.grammar.gender && <span className="text-red-900 border-l border-slate-100 pl-2">G: {result.grammar.gender}</span>}
+                      {result.grammar.plural && <span className="border-l border-slate-100 pl-2">Pl: {result.grammar.plural}</span>}
+                      {result.level && <span className="text-red-900 border-l border-slate-100 pl-2">CEFR: {result.level}</span>}
                     </div>
                   )}
                 </div>
                 
-                <div className="md:text-right border-t md:border-t-0 pt-8 md:pt-0">
+                <div className="md:text-right border-t md:border-t-0 pt-6 md:pt-0 w-full md:w-auto">
                   <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-2">Translation</div>
-                  <div className="flex flex-row md:flex-col items-center md:items-end gap-4 md:gap-0">
-                    <div className="text-3xl sm:text-5xl font-bold serif text-red-900 break-words">{result.mainTranslation}</div>
+                  <div className="flex flex-row md:flex-col items-center md:items-end gap-3 md:gap-1">
+                    <div className="text-2xl sm:text-4xl md:text-5xl font-bold serif text-red-900 leading-tight break-words">{result.mainTranslation}</div>
                     <div className="flex flex-col items-start md:items-end">
                       {result.translationPhonetic && (
-                        <div className="text-slate-400 text-xs sm:text-sm font-medium mt-1 font-mono">[{result.translationPhonetic}]</div>
+                        <div className="text-slate-400 text-[11px] sm:text-sm font-medium font-mono break-all">[{result.translationPhonetic}]</div>
                       )}
                       <button 
                         onClick={() => handleSpeak(result.mainTranslation, targetLang)}
@@ -275,18 +275,18 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8 sm:mb-12 border-t border-slate-50 pt-8 sm:pt-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-10 border-t border-slate-50 pt-8">
                 <div>
-                  <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-4">{LANGUAGE_NAMES[sourceLang]} Synonyms</div>
-                  <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-2">
+                  <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-3">{LANGUAGE_NAMES[sourceLang]} Synonyms</div>
+                  <div className="flex flex-wrap gap-x-2.5 sm:gap-x-4 gap-y-2">
                     {result.sourceSynonyms?.map((alt, i) => (
                       <span key={i} className="text-slate-600 serif text-lg sm:text-xl">{alt}{i < result.sourceSynonyms!.length - 1 ? ',' : ''}</span>
-                    )) || <span className="text-slate-300 italic text-[10px] uppercase tracking-widest">N/A</span>}
+                    )) || <span className="text-slate-300 italic text-[10px] uppercase tracking-widest">None identified</span>}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-4">{LANGUAGE_NAMES[targetLang]} Alternatives</div>
-                  <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-2">
+                  <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-3">{LANGUAGE_NAMES[targetLang]} Alternatives</div>
+                  <div className="flex flex-wrap gap-x-2.5 sm:gap-x-4 gap-y-2">
                     {result.alternatives.map((alt, i) => (
                       <span key={i} className="text-slate-600 serif text-lg sm:text-xl">{alt}{i < result.alternatives.length - 1 ? ',' : ''}</span>
                     ))}
@@ -294,17 +294,19 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-6 sm:space-y-8">
-                <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-4 sm:mb-6 border-b border-slate-50 pb-2">Contextual Examples</div>
-                {result.examples.map((ex, idx) => (
-                  <ExampleCard key={idx} example={ex} />
-                ))}
+              <div className="space-y-6">
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-4 border-b border-slate-50 pb-2">Contextual Examples</div>
+                <div className="grid grid-cols-1 gap-4">
+                  {result.examples.map((ex, idx) => (
+                    <ExampleCard key={idx} example={ex} />
+                  ))}
+                </div>
               </div>
 
               {result.etymology && (
-                <div className="mt-12 sm:mt-16 pt-6 sm:pt-8 border-t border-slate-50">
+                <div className="mt-10 pt-6 border-t border-slate-50">
                   <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-3">Origin & Etymology</div>
-                  <p className="text-slate-500 serif italic leading-relaxed text-sm">
+                  <p className="text-slate-500 serif italic leading-relaxed text-sm sm:text-base">
                     {result.etymology}
                   </p>
                 </div>
@@ -314,27 +316,27 @@ const App: React.FC = () => {
         )}
 
         {isLoading && (
-          <div className="py-16 sm:py-20 flex flex-col items-center gap-6">
+          <div className="py-16 flex flex-col items-center gap-5">
             <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-red-900/10 border-t-red-900 rounded-full animate-spin"></div>
-            <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.4em] text-slate-300 font-bold animate-pulse">Consulting Archive...</div>
+            <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.4em] text-slate-300 font-bold animate-pulse text-center">Consulting Archive...</div>
           </div>
         )}
 
-        <section className="mt-12 sm:mt-20">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 border-b border-slate-100 pb-4 gap-4">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <section className="mt-12 sm:mt-16">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 border-b border-slate-100 pb-3 gap-3">
+            <h3 className="text-[11px] sm:text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Recent Searches
+              Recent Records
             </h3>
             
-            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0 no-scrollbar scroll-smooth">
               {HISTORY_CATEGORIES.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveFilter(cat)}
-                  className={`flex-shrink-0 px-2.5 sm:px-3 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all ${activeFilter === cat ? 'bg-red-900 text-white' : 'bg-slate-100 text-slate-400 hover:text-slate-600'}`}
+                  className={`flex-shrink-0 px-2.5 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all ${activeFilter === cat ? 'bg-red-900 text-white' : 'bg-slate-100 text-slate-400 hover:text-slate-600'}`}
                 >
                   {cat}
                 </button>
@@ -355,33 +357,34 @@ const App: React.FC = () => {
                   }}
                   className="bg-white p-4 sm:p-5 text-left hover:bg-slate-50 transition-colors flex items-center justify-between group"
                 >
-                  <div className="truncate pr-4">
-                    <span className="text-slate-800 font-medium serif block truncate">{item.term}</span>
-                    <span className="text-[8px] uppercase tracking-[0.2em] text-red-900/50 font-bold">{item.category}</span>
+                  <div className="truncate pr-3">
+                    <span className="text-slate-800 font-medium serif block truncate text-base">{item.term}</span>
+                    <span className="text-[8px] uppercase tracking-[0.15em] text-red-900/50 font-bold">{item.category}</span>
                   </div>
-                  <span className="text-[8px] uppercase tracking-widest text-slate-300 group-hover:text-red-900 font-bold whitespace-nowrap">
+                  <span className="text-[8px] uppercase tracking-widest text-slate-300 group-hover:text-red-900 font-bold whitespace-nowrap border border-slate-50 px-1 rounded-sm">
                     {item.sourceLang.toUpperCase()} → {item.targetLang.toUpperCase()}
                   </span>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 sm:py-16 border border-dashed border-slate-200 rounded-none">
+            <div className="text-center py-12 border border-dashed border-slate-200">
               <p className="text-slate-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] italic">No archive records found</p>
             </div>
           )}
         </section>
       </main>
 
-      <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 py-4 sm:py-5 px-6 sm:px-8 flex justify-between items-center z-30">
-        <div className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] sm:tracking-[0.3em] truncate mr-4">
-          Polyglot Archive & Linguistics
+      <footer className="mt-auto bg-white border-t border-slate-100 py-5 px-6 sm:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] sm:tracking-[0.3em] text-center sm:text-left">
+          Lexicon Archive <span className="text-slate-200">|</span> Polyglot Linguistic System
         </div>
         <div className="flex gap-4 sm:gap-6 items-center flex-shrink-0">
-           <div className="text-[9px] text-slate-300 font-medium uppercase tracking-widest hidden sm:block">Powered by Gemini</div>
-           <div className="flex gap-1.5 sm:gap-2">
-             <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-900"></div>
-             <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-slate-100"></div>
+           <div className="text-[9px] text-slate-300 font-medium uppercase tracking-widest hidden md:block">Engineered with Gemini</div>
+           <div className="flex gap-1.5">
+             <div className="w-1.5 h-1.5 rounded-full bg-red-900"></div>
+             <div className="w-1.5 h-1.5 rounded-full bg-slate-100"></div>
+             <div className="w-1.5 h-1.5 rounded-full bg-slate-100"></div>
            </div>
         </div>
       </footer>
