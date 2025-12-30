@@ -13,18 +13,29 @@ export const translateWithGemini = async (
   const tName = LANGUAGE_NAMES[targetLang];
 
   const prompt = `Advanced Polyglot Dictionary: Translate "${query}" from ${sName} to ${tName}.
-  Return JSON with IPA transcripts, grammar, alternatives, and 3 example sentences from books or movies.
+  Return JSON with high-quality linguistic data.
+  Specifically:
+  - 'level': Provide CEFR level (e.g. A1, B2, C1).
+  - 'grammar': Include gender (m/f/n) and plural form for nouns, and a 'notes' field for usage advice (e.g. "Used with dative").
+  - 'sourceSynonyms': List 3-4 synonyms in ${sName}.
+  - 'alternatives': List 3-4 synonyms/alternatives in ${tName}.
+  - 'examples': 3 contextual sentences from literary, news, or cinematic sources.
+  
+  Format:
   {
     "term": "${query}",
     "termPhonetic": "IPA",
     "mainTranslation": "primary",
-    "translationPhonetic": "IPA",
-    "alternatives": ["synonyms in ${tName}"],
-    "sourceSynonyms": ["synonyms in ${sName}"],
-    "level": "A1-C2",
-    "grammar": {"partOfSpeech": "Noun/Verb/etc", "gender": "m/f/n", "plural": "form", "conjugation": "hint", "notes": "notes"},
-    "examples": [{"text": "sentence in ${sName}", "translation": "translation in ${tName}", "sourceTitle": "source", "sourceType": "book/movie"}],
-    "etymology": "history"
+    "level": "B1",
+    "alternatives": ["synonym1", "synonym2"],
+    "sourceSynonyms": ["synonym1", "synonym2"],
+    "grammar": {
+      "partOfSpeech": "NOUN",
+      "gender": "m",
+      "plural": "plural_form",
+      "notes": "Usage note here"
+    },
+    "examples": [{"text": "...", "translation": "...", "sourceTitle": "NEWSPAPER", "sourceType": "general"}]
   }`;
 
   const response = await ai.models.generateContent({
@@ -39,17 +50,15 @@ export const translateWithGemini = async (
           term: { type: Type.STRING },
           termPhonetic: { type: Type.STRING },
           mainTranslation: { type: Type.STRING },
-          translationPhonetic: { type: Type.STRING },
+          level: { type: Type.STRING },
           alternatives: { type: Type.ARRAY, items: { type: Type.STRING } },
           sourceSynonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
-          level: { type: Type.STRING },
           grammar: {
             type: Type.OBJECT,
             properties: {
               partOfSpeech: { type: Type.STRING },
               gender: { type: Type.STRING },
               plural: { type: Type.STRING },
-              conjugation: { type: Type.STRING },
               notes: { type: Type.STRING }
             },
             required: ["partOfSpeech"]
@@ -66,8 +75,7 @@ export const translateWithGemini = async (
               },
               required: ["text", "translation", "sourceTitle"]
             }
-          },
-          etymology: { type: Type.STRING }
+          }
         },
         required: ["term", "mainTranslation", "examples", "grammar"]
       }
@@ -78,12 +86,35 @@ export const translateWithGemini = async (
 };
 
 export const generateQuizFromHistory = async (history: HistoryItem[]): Promise<QuizQuestion[]> => {
-  const terms = history.slice(0, 15).map(h => `${h.term} (${LANGUAGE_NAMES[h.sourceLang]} to ${LANGUAGE_NAMES[h.targetLang]})`).join(', ');
+  // Extract unique terms to ensure variety
+  const uniqueHistory = Array.from(new Set(history.map(h => h.term))).map(term => {
+    return history.find(h => h.term === term)!;
+  });
+
+  const termsData = uniqueHistory.slice(0, 15).map(h => 
+    `{ Term: "${h.term}", Translation: "${h.translation || 'unknown'}", From: "${LANGUAGE_NAMES[h.sourceLang]}", To: "${LANGUAGE_NAMES[h.targetLang]}" }`
+  ).join(', ');
   
-  const prompt = `Create a 5-question multiple choice quiz based on these words: ${terms}. 
-  If the list is too short, add relevant common academic words. 
-  Each question should test either translation, grammar (gender/plural), or usage in a sentence.
-  Return a JSON array of objects with: question, options (4 items), correctAnswer, explanation, and wordId.`;
+  const prompt = `STRICT RULE: Create a 5-question quiz based ONLY on these entries from the user's history: [${termsData}].
+  
+  BI-DIRECTIONAL TESTING:
+  For each question, randomly choose to either:
+  1. Ask for the translation from the Source Language to the Target Language.
+  2. Ask for the translation from the Target Language back to the Source Language.
+  
+  Example Bi-directional:
+  Search: "Guten" (DE) -> "Yaxshi" (UZ)
+  Possible Question 1: "Guten" (Options: a) Yaxshi, b) Yomon, c) Xunuk)
+  Possible Question 2: "Yaxshi" (Options: a) Guten, b) Tag, c) Das)
+  
+  DO NOT use words outside of this history unless as incorrect distractors.
+  Return a JSON array of objects with:
+  - question: string (The word to translate)
+  - options: string[] (Exactly 4 options)
+  - correctAnswer: string (The correct translation)
+  - explanation: string (A helpful note about the word's usage)
+  - wordId: string (Unique ID for the word)
+  `;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -126,7 +157,6 @@ export const generateSpeech = async (text: string, lang: SupportedLanguage): Pro
   return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
 };
 
-// Internal audio decoding helpers following @google/genai guidelines
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -158,11 +188,8 @@ async function decodeAudioData(
 
 export const playBase64Audio = async (base64: string) => {
   const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-  
-  // Fix: Standardize decoding of base64 raw PCM audio data
   const audioData = decode(base64);
   const audioBuffer = await decodeAudioData(audioData, audioContext, 24000, 1);
-  
   const source = audioContext.createBufferSource();
   source.buffer = audioBuffer;
   source.connect(audioContext.destination);

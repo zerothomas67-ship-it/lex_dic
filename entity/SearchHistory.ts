@@ -13,6 +13,9 @@ export class SearchHistory {
   @Column()
   term: string;
 
+  @Column({ nullable: true })
+  translation: string;
+
   @Column()
   sourceLang: string;
 

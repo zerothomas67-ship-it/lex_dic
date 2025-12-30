@@ -42,6 +42,7 @@ export interface TranslationResult {
 export interface HistoryItem {
   id: string;
   term: string;
+  translation?: string; // Added to store the primary translation for better quizzes
   category: string;
   sourceLang: SupportedLanguage;
   targetLang: SupportedLanguage;

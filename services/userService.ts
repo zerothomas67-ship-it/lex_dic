@@ -9,6 +9,7 @@ export interface UserSyncPayload {
 export interface HistoryEntryPayload {
   telegramId: string;
   term: string;
+  translation: string;
   sourceLang: string;
   targetLang: string;
   category: string;

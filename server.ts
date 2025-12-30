@@ -9,9 +9,7 @@ import { SearchHistory } from "./entity/SearchHistory";
 dotenv.config();
 
 const app = express();
-// Fix: Cast middleware to any to resolve TypeScript overload resolution ambiguity where use() expects PathParams
 app.use(express.json() as any);
-// Fix: Cast middleware to any to resolve TypeScript overload resolution ambiguity where use() expects PathParams
 app.use(cors() as any);
 
 const PORT = process.env.PORT || 3000;
@@ -67,10 +65,10 @@ AppDataSource.initialize()
     });
 
     app.post("/api/history", async (req, res) => {
-      const { telegramId, term, sourceLang, targetLang, category } = req.body;
+      const { telegramId, term, translation, sourceLang, targetLang, category } = req.body;
       try {
         const historyRepo = AppDataSource.getRepository(SearchHistory);
-        const entry = historyRepo.create({ telegramId, term, sourceLang, targetLang, category });
+        const entry = historyRepo.create({ telegramId, term, translation, sourceLang, targetLang, category });
         await historyRepo.save(entry);
         res.json({ success: true });
       } catch (err) {
