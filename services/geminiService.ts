@@ -1,8 +1,7 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { SupportedLanguage, LANGUAGE_NAMES, TranslationResult } from "../types";
+import { SupportedLanguage, LANGUAGE_NAMES, TranslationResult, QuizQuestion, HistoryItem } from "../types";
 
-// Always initialize with process.env.API_KEY directly.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const translateWithGemini = async (
@@ -13,20 +12,19 @@ export const translateWithGemini = async (
   const sName = LANGUAGE_NAMES[sourceLang];
   const tName = LANGUAGE_NAMES[targetLang];
 
-  const prompt = `Advanced Polyglot Dictionary: Translate the word or phrase "${query}" from ${sName} to ${tName}.
-  Provide detailed linguistic metadata including IPA phonetic transcripts for both the source word and the primary translation.
-  Return JSON:
+  const prompt = `Advanced Polyglot Dictionary: Translate "${query}" from ${sName} to ${tName}.
+  Return JSON with IPA transcripts, grammar, alternatives, and 3 example sentences from books or movies.
   {
     "term": "${query}",
-    "termPhonetic": "IPA transcript for source",
-    "mainTranslation": "primary translation",
-    "translationPhonetic": "IPA transcript for target",
+    "termPhonetic": "IPA",
+    "mainTranslation": "primary",
+    "translationPhonetic": "IPA",
     "alternatives": ["synonyms in ${tName}"],
     "sourceSynonyms": ["synonyms in ${sName}"],
-    "level": "A1-C2 if applicable",
+    "level": "A1-C2",
     "grammar": {"partOfSpeech": "Noun/Verb/etc", "gender": "m/f/n", "plural": "form", "conjugation": "hint", "notes": "notes"},
     "examples": [{"text": "sentence in ${sName}", "translation": "translation in ${tName}", "sourceTitle": "source", "sourceType": "book/movie"}],
-    "etymology": "brief history"
+    "etymology": "history"
   }`;
 
   const response = await ai.models.generateContent({
@@ -76,25 +74,44 @@ export const translateWithGemini = async (
     }
   });
 
-  try {
-    // Correctly using the .text property as defined in guidelines.
-    const text = response.text || '{}';
-    return JSON.parse(text);
-  } catch (error) {
-    console.error("Failed to parse Gemini response", error);
-    throw new Error("Invalid translation response");
-  }
+  return JSON.parse(response.text || '{}');
+};
+
+export const generateQuizFromHistory = async (history: HistoryItem[]): Promise<QuizQuestion[]> => {
+  const terms = history.slice(0, 15).map(h => `${h.term} (${LANGUAGE_NAMES[h.sourceLang]} to ${LANGUAGE_NAMES[h.targetLang]})`).join(', ');
+  
+  const prompt = `Create a 5-question multiple choice quiz based on these words: ${terms}. 
+  If the list is too short, add relevant common academic words. 
+  Each question should test either translation, grammar (gender/plural), or usage in a sentence.
+  Return a JSON array of objects with: question, options (4 items), correctAnswer, explanation, and wordId.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            question: { type: Type.STRING },
+            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+            correctAnswer: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+            wordId: { type: Type.STRING }
+          },
+          required: ["question", "options", "correctAnswer", "explanation", "wordId"]
+        }
+      }
+    }
+  });
+
+  return JSON.parse(response.text || '[]');
 };
 
 export const generateSpeech = async (text: string, lang: SupportedLanguage): Promise<string> => {
-  // Map our internal lang codes to supported voices
-  const voiceMap: Record<string, string> = {
-    de: 'Kore',
-    uz: 'Zephyr', // Approximation
-    en: 'Puck',
-    ru: 'Charon' // Approximation
-  };
-  
+  const voiceMap: Record<string, string> = { de: 'Kore', uz: 'Zephyr', en: 'Puck', ru: 'Charon' };
   const voiceName = voiceMap[lang] || 'Zephyr';
   
   const response = await ai.models.generateContent({
@@ -102,38 +119,52 @@ export const generateSpeech = async (text: string, lang: SupportedLanguage): Pro
     contents: [{ parts: [{ text: `Say this clearly: ${text}` }] }],
     config: {
       responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName },
-        },
-      },
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
     },
   });
 
-  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!base64Audio) throw new Error("Audio generation failed");
-  return base64Audio;
+  return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
 };
 
-export const playBase64Audio = async (base64: string) => {
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+// Internal audio decoding helpers following @google/genai guidelines
+function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
+  return bytes;
+}
 
-  const dataInt16 = new Int16Array(bytes.buffer);
-  const frameCount = dataInt16.length;
-  const buffer = audioContext.createBuffer(1, frameCount, 24000);
-  const channelData = buffer.getChannelData(0);
-  for (let i = 0; i < frameCount; i++) {
-    channelData[i] = dataInt16[i] / 32768.0;
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
   }
+  return buffer;
+}
 
+export const playBase64Audio = async (base64: string) => {
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+  
+  // Fix: Standardize decoding of base64 raw PCM audio data
+  const audioData = decode(base64);
+  const audioBuffer = await decodeAudioData(audioData, audioContext, 24000, 1);
+  
   const source = audioContext.createBufferSource();
-  source.buffer = buffer;
+  source.buffer = audioBuffer;
   source.connect(audioContext.destination);
   source.start();
 };

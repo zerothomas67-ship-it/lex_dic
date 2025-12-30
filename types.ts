@@ -22,12 +22,12 @@ export interface ExampleSource {
 
 export interface TranslationResult {
   term: string;
-  termPhonetic?: string; // Transcript/IPA for the source term
+  termPhonetic?: string;
   mainTranslation: string;
-  translationPhonetic?: string; // Transcript/IPA for the target term
-  alternatives: string[]; // Synonyms in the target language
-  sourceSynonyms?: string[]; // Synonyms in the source language
-  level?: string; // CEFR level
+  translationPhonetic?: string;
+  alternatives: string[];
+  sourceSynonyms?: string[];
+  level?: string;
   grammar?: {
     partOfSpeech: string;
     gender?: 'm' | 'f' | 'n';
@@ -50,4 +50,20 @@ export interface HistoryItem {
 
 export interface TranslationCache {
   [key: string]: TranslationResult;
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  wordId: string; // The word this question is based on
+}
+
+export interface QuizSession {
+  questions: QuizQuestion[];
+  currentIdx: number;
+  score: number;
+  isFinished: boolean;
 }
