@@ -6,17 +6,20 @@ import { syncUserWithBackend, saveSearchToBackend, fetchUserHistory, addXpToUser
 import LanguageSelector from './components/LanguageSelector';
 import ExampleCard from './components/ExampleCard';
 
-const STORAGE_KEY_HISTORY = 'uzger_history_v4'; // Key version bump to ensure fresh sync
+const STORAGE_KEY_HISTORY = 'uzger_history_v4';
 const STORAGE_KEY_CACHE = 'uzger_cache_v4';
+const STORAGE_KEY_AUTO_AUDIO = 'uzger_auto_audio';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'dictionary' | 'arena'>('dictionary');
   const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<HistoryItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [sourceLang, setSourceLang] = useState<SupportedLanguage>('de');
   const [targetLang, setTargetLang] = useState<SupportedLanguage>('uz');
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [tgUser, setTgUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -24,18 +27,21 @@ const App: React.FC = () => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [arenaError, setArenaError] = useState<string | null>(null);
+  const [autoAudioEnabled, setAutoAudioEnabled] = useState(true);
 
   const cacheRef = useRef<TranslationCache>({});
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 1. Initial load from Local Storage
     const localHistory = localStorage.getItem(STORAGE_KEY_HISTORY);
     if (localHistory) setHistory(JSON.parse(localHistory));
 
     const savedCache = sessionStorage.getItem(STORAGE_KEY_CACHE);
     if (savedCache) cacheRef.current = JSON.parse(savedCache);
 
-    // 2. Telegram Integration
+    const savedAutoAudio = localStorage.getItem(STORAGE_KEY_AUTO_AUDIO);
+    if (savedAutoAudio !== null) setAutoAudioEnabled(savedAutoAudio === 'true');
+
     const tg = (window as any).Telegram?.WebApp;
     if (tg) {
       tg.ready();
@@ -46,7 +52,32 @@ const App: React.FC = () => {
         initUserData(user);
       }
     }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_AUTO_AUDIO, String(autoAudioEnabled));
+  }, [autoAudioEnabled]);
+
+  useEffect(() => {
+    if (query.trim().length > 0) {
+      const filtered = history.filter(item => 
+        item.term.toLowerCase().startsWith(query.toLowerCase())
+      ).slice(0, 5);
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [query, history]);
 
   const initUserData = async (user: any) => {
     try {
@@ -72,7 +103,6 @@ const App: React.FC = () => {
         
         setHistory(prev => {
           const combined = [...prev, ...mapped];
-          // Use Map to deduplicate by term (lowercased)
           const unique = Array.from(new Map(combined.map(item => [item.term.toLowerCase(), item])).values());
           const sorted = unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
           localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(sorted));
@@ -84,54 +114,16 @@ const App: React.FC = () => {
     }
   };
 
-  const startQuiz = async () => {
-    if (history.length === 0) {
-      const tg = (window as any).Telegram?.WebApp;
-      const msg = "Please search for some words first to populate the Arena!";
-      if (tg) tg.showAlert(msg); else alert(msg);
-      return;
-    }
-    
-    setIsLoading(true);
-    setArenaError(null);
-    setView('arena');
+  const handleSpeak = async (text: string, lang: SupportedLanguage, id: string) => {
+    if (isSpeaking) return;
+    setIsSpeaking(id);
     try {
-      const questions = await generateQuizFromHistory(history);
-      if (!questions || questions.length === 0) {
-        throw new Error("No questions generated. Try searching for more words.");
-      }
-      setQuiz({ questions, currentIdx: 0, score: 0, isFinished: false });
+      const audio = await generateSpeech(text, lang);
+      await playBase64Audio(audio);
     } catch (err) {
       console.error(err);
-      setArenaError(err instanceof Error ? err.message : "Failed to generate arena.");
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAnswer = (option: string) => {
-    if (selectedOption || !quiz) return;
-    setSelectedOption(option);
-    setShowExplanation(true);
-    const isCorrect = option === quiz.questions[quiz.currentIdx].correctAnswer;
-    if (isCorrect) setQuiz({ ...quiz, score: quiz.score + 20 });
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
-  };
-
-  const nextQuestion = async () => {
-    if (!quiz) return;
-    if (quiz.currentIdx === quiz.questions.length - 1) {
-      setQuiz({ ...quiz, isFinished: true });
-      if (tgUser) {
-        await addXpToUser(tgUser.id.toString(), quiz.score);
-        const profile = await fetchUserProfile(tgUser.id.toString());
-        setUserProfile(profile);
-      }
-    } else {
-      setQuiz({ ...quiz, currentIdx: quiz.currentIdx + 1 });
-      setSelectedOption(null);
-      setShowExplanation(false);
+      setIsSpeaking(null);
     }
   };
 
@@ -140,11 +132,15 @@ const App: React.FC = () => {
     const finalQuery = (overrideQuery || query).trim();
     if (!finalQuery) return;
     
+    setShowSuggestions(false);
+    setQuery(finalQuery);
+
     const cacheKey = `${sourceLang}_${targetLang}_${finalQuery.toLowerCase()}`;
     if (cacheRef.current[cacheKey]) {
       const cachedResult = cacheRef.current[cacheKey];
       setResult(cachedResult);
       updateHistoryLocally(finalQuery, cachedResult);
+      if (autoAudioEnabled) handleSpeak(cachedResult.term, sourceLang, 'term-auto');
       return;
     }
 
@@ -156,6 +152,7 @@ const App: React.FC = () => {
       sessionStorage.setItem(STORAGE_KEY_CACHE, JSON.stringify(cacheRef.current));
       
       updateHistoryLocally(finalQuery, translation);
+      if (autoAudioEnabled) handleSpeak(translation.term, sourceLang, 'term-auto');
 
       if (tgUser) {
         saveSearchToBackend({
@@ -193,22 +190,54 @@ const App: React.FC = () => {
     });
   };
 
-  const handleSpeak = async (text: string, lang: SupportedLanguage) => {
-    if (isSpeaking) return;
-    setIsSpeaking(true);
+  const startQuiz = async () => {
+    if (history.length === 0) {
+      const tg = (window as any).Telegram?.WebApp;
+      const msg = "Please search for some words first to populate the Arena!";
+      if (tg) tg.showAlert(msg); else alert(msg);
+      return;
+    }
+    setIsLoading(true);
+    setArenaError(null);
+    setView('arena');
     try {
-      const audio = await generateSpeech(text, lang);
-      await playBase64Audio(audio);
+      const questions = await generateQuizFromHistory(history);
+      setQuiz({ questions, currentIdx: 0, score: 0, isFinished: false });
     } catch (err) {
-      console.error(err);
+      setArenaError(err instanceof Error ? err.message : "Failed to generate arena.");
     } finally {
-      setIsSpeaking(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleAnswer = (option: string) => {
+    if (selectedOption || !quiz) return;
+    setSelectedOption(option);
+    setShowExplanation(true);
+    const isCorrect = option === quiz.questions[quiz.currentIdx].correctAnswer;
+    if (isCorrect) setQuiz({ ...quiz, score: quiz.score + 20 });
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
+  };
+
+  const nextQuestion = async () => {
+    if (!quiz) return;
+    if (quiz.currentIdx === quiz.questions.length - 1) {
+      setQuiz({ ...quiz, isFinished: true });
+      if (tgUser) {
+        await addXpToUser(tgUser.id.toString(), quiz.score);
+        const profile = await fetchUserProfile(tgUser.id.toString());
+        setUserProfile(profile);
+      }
+    } else {
+      setQuiz({ ...quiz, currentIdx: quiz.currentIdx + 1 });
+      setSelectedOption(null);
+      setShowExplanation(false);
     }
   };
 
   const renderDictionary = () => (
     <>
-      {/* XP Dashboard */}
       {userProfile && (
         <section className="mb-8 bg-slate-900 text-white p-8 shadow-2xl border-l-8 border-red-900 animate-in fade-in slide-in-from-left-4 duration-700">
           <div className="flex justify-between items-center">
@@ -230,12 +259,24 @@ const App: React.FC = () => {
         </section>
       )}
 
-      <section className="mb-10 relative">
-        <form onSubmit={handleTranslate} className="relative group">
+      <div className="flex justify-end mb-4 items-center gap-3">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Auto-Pronounce</span>
+        <button 
+          onClick={() => setAutoAudioEnabled(!autoAudioEnabled)}
+          className={`relative w-10 h-5 transition-colors rounded-full ${autoAudioEnabled ? 'bg-red-900' : 'bg-slate-200'}`}
+        >
+          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${autoAudioEnabled ? 'left-5.5' : 'left-0.5'}`} style={{ left: autoAudioEnabled ? 'calc(100% - 1.25rem)' : '0.125rem' }}></div>
+        </button>
+      </div>
+
+      <section className="mb-10 relative" ref={searchRef}>
+        <form onSubmit={handleTranslate} className="relative group z-30">
           <input
             type="text"
             value={query}
+            autoComplete="off"
             onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => query.trim() && setShowSuggestions(suggestions.length > 0)}
             placeholder={`Enter term to translate...`}
             className="w-full bg-white border border-slate-200 pl-4 pr-12 sm:pl-8 sm:pr-20 py-5 sm:py-7 rounded-none focus:border-red-900 transition-all text-xl sm:text-3xl serif outline-none shadow-sm group-hover:shadow-lg placeholder:text-slate-300"
           />
@@ -243,27 +284,67 @@ const App: React.FC = () => {
             {isLoading ? <div className="w-6 h-6 border-3 border-red-900/20 border-t-red-900 rounded-full animate-spin" /> : <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>}
           </button>
         </form>
+
+        {showSuggestions && (
+          <div className="absolute top-full left-0 w-full bg-white border-x border-b border-slate-100 shadow-2xl z-20 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+            {suggestions.map((s) => (
+              <button 
+                key={s.id}
+                onClick={() => handleTranslate(undefined, s.term)}
+                className="w-full text-left p-4 hover:bg-slate-50 flex items-center justify-between group transition-colors border-b border-slate-50 last:border-0"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-4 h-4 text-slate-300 group-hover:text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span className="serif text-lg text-slate-700 group-hover:text-black">{s.term}</span>
+                </div>
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{s.sourceLang} → {s.targetLang}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {result && !isLoading && (
         <div className="bg-white border border-slate-100 p-6 sm:p-12 mb-10 shadow-xl animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex flex-col md:flex-row md:justify-between items-baseline gap-6 mb-6">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4 flex-wrap">
               <h2 className="text-5xl sm:text-7xl font-bold serif text-slate-900 break-words tracking-tight">{result.term}</h2>
-              {result.level && (
-                <span className="bg-red-900 text-white px-3 py-1 text-[12px] font-bold rounded-sm uppercase tracking-widest self-start mt-3">
-                  {result.level}
-                </span>
-              )}
-              <button onClick={() => handleSpeak(result.term, sourceLang)} className="text-slate-200 hover:text-red-900 transition-colors p-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className={`h-8 w-8 ${isSpeaking ? 'animate-pulse text-red-900' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                </svg>
-              </button>
+              <div className="flex gap-2 self-start mt-3">
+                {sourceLang !== 'uz' && result.sourceLevel && (
+                  <span className="bg-slate-900 text-white px-2 py-0.5 text-[10px] font-bold rounded-sm uppercase tracking-widest whitespace-nowrap">
+                    {sourceLang.toUpperCase()}: {result.sourceLevel}
+                  </span>
+                )}
+                <button 
+                  onClick={() => handleSpeak(result.term, sourceLang, 'source-main')} 
+                  className={`transition-all p-1.5 rounded-full hover:bg-slate-50 ${isSpeaking === 'source-main' ? 'text-red-900 scale-110' : 'text-slate-200 hover:text-red-900'}`}
+                >
+                  <svg className={`h-6 w-6 ${isSpeaking === 'source-main' ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div className="md:text-right w-full md:w-auto">
+            <div className="md:text-right w-full md:w-auto flex flex-col md:items-end">
               <span className="text-[11px] uppercase tracking-[0.4em] text-slate-300 font-bold block mb-2">Lexical Result</span>
-              <h3 className="text-5xl sm:text-7xl font-bold serif text-red-900 tracking-tight">{result.mainTranslation}</h3>
+              <div className="flex items-center gap-4 justify-end flex-wrap">
+                <div className="flex gap-2 items-center">
+                  <button 
+                    onClick={() => handleSpeak(result.mainTranslation, targetLang, 'target-main')} 
+                    className={`transition-all p-1.5 rounded-full hover:bg-slate-50 ${isSpeaking === 'target-main' ? 'text-red-900 scale-110' : 'text-slate-200 hover:text-red-900'}`}
+                  >
+                    <svg className={`h-6 w-6 ${isSpeaking === 'target-main' ? 'animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                  </button>
+                  {targetLang !== 'uz' && result.targetLevel && (
+                    <span className="bg-red-900 text-white px-2 py-0.5 text-[10px] font-bold rounded-sm uppercase tracking-widest whitespace-nowrap">
+                      {targetLang.toUpperCase()}: {result.targetLevel}
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-5xl sm:text-7xl font-bold serif text-red-900 tracking-tight">{result.mainTranslation}</h3>
+              </div>
             </div>
           </div>
 
@@ -337,7 +418,7 @@ const App: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {history.length > 0 ? history.map(item => (
-            <button key={item.id} onClick={() => { setQuery(item.term); handleTranslate(undefined, item.term); }} className="bg-white p-6 text-left border border-slate-100 hover:border-red-900 hover:shadow-lg transition-all group relative overflow-hidden">
+            <button key={item.id} onClick={() => handleTranslate(undefined, item.term)} className="bg-white p-6 text-left border border-slate-100 hover:border-red-900 hover:shadow-lg transition-all group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                  <svg className="w-4 h-4 text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5l7 7-7 7" strokeWidth={2}/></svg>
               </div>

@@ -15,8 +15,9 @@ export const translateWithGemini = async (
   const prompt = `Advanced Polyglot Dictionary: Translate "${query}" from ${sName} to ${tName}.
   Return JSON with high-quality linguistic data.
   Specifically:
-  - 'level': Provide CEFR level (e.g. A1, B2, C1).
-  - 'grammar': Include gender (m/f/n) and plural form for nouns, and a 'notes' field for usage advice (e.g. "Used with dative").
+  - 'sourceLevel': Provide CEFR level (A1-C2) for the ${sName} term (Skip if language is Uzbek).
+  - 'targetLevel': Provide CEFR level (A1-C2) for the ${tName} translation (Skip if language is Uzbek).
+  - 'grammar': Include gender (m/f/n) and plural form for nouns, and a 'notes' field for usage advice.
   - 'sourceSynonyms': List 3-4 synonyms in ${sName}.
   - 'alternatives': List 3-4 synonyms/alternatives in ${tName}.
   - 'examples': 3 contextual sentences from literary, news, or cinematic sources.
@@ -26,7 +27,8 @@ export const translateWithGemini = async (
     "term": "${query}",
     "termPhonetic": "IPA",
     "mainTranslation": "primary",
-    "level": "B1",
+    "sourceLevel": "B2",
+    "targetLevel": "B1",
     "alternatives": ["synonym1", "synonym2"],
     "sourceSynonyms": ["synonym1", "synonym2"],
     "grammar": {
@@ -50,7 +52,8 @@ export const translateWithGemini = async (
           term: { type: Type.STRING },
           termPhonetic: { type: Type.STRING },
           mainTranslation: { type: Type.STRING },
-          level: { type: Type.STRING },
+          sourceLevel: { type: Type.STRING },
+          targetLevel: { type: Type.STRING },
           alternatives: { type: Type.ARRAY, items: { type: Type.STRING } },
           sourceSynonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
           grammar: {
@@ -86,35 +89,13 @@ export const translateWithGemini = async (
 };
 
 export const generateQuizFromHistory = async (history: HistoryItem[]): Promise<QuizQuestion[]> => {
-  // Extract unique terms to ensure variety
-  const uniqueHistory = Array.from(new Set(history.map(h => h.term))).map(term => {
-    return history.find(h => h.term === term)!;
-  });
-
+  const uniqueHistory = Array.from(new Map(history.map(item => [item.term.toLowerCase(), item])).values());
   const termsData = uniqueHistory.slice(0, 15).map(h => 
     `{ Term: "${h.term}", Translation: "${h.translation || 'unknown'}", From: "${LANGUAGE_NAMES[h.sourceLang]}", To: "${LANGUAGE_NAMES[h.targetLang]}" }`
   ).join(', ');
   
-  const prompt = `STRICT RULE: Create a 5-question quiz based ONLY on these entries from the user's history: [${termsData}].
-  
-  BI-DIRECTIONAL TESTING:
-  For each question, randomly choose to either:
-  1. Ask for the translation from the Source Language to the Target Language.
-  2. Ask for the translation from the Target Language back to the Source Language.
-  
-  Example Bi-directional:
-  Search: "Guten" (DE) -> "Yaxshi" (UZ)
-  Possible Question 1: "Guten" (Options: a) Yaxshi, b) Yomon, c) Xunuk)
-  Possible Question 2: "Yaxshi" (Options: a) Guten, b) Tag, c) Das)
-  
-  DO NOT use words outside of this history unless as incorrect distractors.
-  Return a JSON array of objects with:
-  - question: string (The word to translate)
-  - options: string[] (Exactly 4 options)
-  - correctAnswer: string (The correct translation)
-  - explanation: string (A helpful note about the word's usage)
-  - wordId: string (Unique ID for the word)
-  `;
+  const prompt = `STRICT RULE: Create a 5-question quiz based ONLY on these entries: [${termsData}].
+  Return a JSON array of objects with question, options, correctAnswer, explanation, and wordId.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",

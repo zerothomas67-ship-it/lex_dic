@@ -27,7 +27,8 @@ export interface TranslationResult {
   translationPhonetic?: string;
   alternatives: string[];
   sourceSynonyms?: string[];
-  level?: string;
+  sourceLevel?: string;
+  targetLevel?: string;
   grammar?: {
     partOfSpeech: string;
     gender?: 'm' | 'f' | 'n';
@@ -42,7 +43,7 @@ export interface TranslationResult {
 export interface HistoryItem {
   id: string;
   term: string;
-  translation?: string; // Added to store the primary translation for better quizzes
+  translation?: string;
   category: string;
   sourceLang: SupportedLanguage;
   targetLang: SupportedLanguage;
@@ -59,7 +60,7 @@ export interface QuizQuestion {
   options: string[];
   correctAnswer: string;
   explanation: string;
-  wordId: string; // The word this question is based on
+  wordId: string;
 }
 
 export interface QuizSession {
