@@ -1,0 +1,7 @@
+{
+  "name": "UzGer Lexicon",
+  "description": "An advanced German-Uzbek translator and dictionary featuring literary and cinematic examples, grammar insights, and high-quality voice pronunciation.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
