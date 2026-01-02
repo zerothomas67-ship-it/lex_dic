@@ -1,16 +1,19 @@
 
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from "typeorm";
 import { User } from "./User";
 
 @Entity("search_history")
+@Index(["telegramId", "timestamp"]) // Speed up history tab
 export class SearchHistory {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
+  @Index()
   telegramId: string;
 
   @Column()
+  @Index()
   term: string;
 
   @Column({ nullable: true })

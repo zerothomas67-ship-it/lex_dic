@@ -14,30 +14,23 @@ export const translateWithGemini = async (
 
   const prompt = `Advanced Polyglot Dictionary: Translate "${query}" from ${sName} to ${tName}.
   Return JSON with high-quality linguistic data.
-  Specifically:
-  - 'sourceLevel': Provide CEFR level (A1-C2) for the ${sName} term (Skip if language is Uzbek).
-  - 'targetLevel': Provide CEFR level (A1-C2) for the ${tName} translation (Skip if language is Uzbek).
-  - 'grammar': Include gender (m/f/n) and plural form for nouns, and a 'notes' field for usage advice.
-  - 'sourceSynonyms': List 3-4 synonyms in ${sName}.
-  - 'alternatives': List 3-4 synonyms/alternatives in ${tName}.
-  - 'examples': 3 contextual sentences from literary, news, or cinematic sources.
+  - 'grammar': Include gender (m/f/n), plural form, and usage 'notes'.
+  - 'examples': 3 contextual sentences from literature/film.
   
   Format:
   {
     "term": "${query}",
-    "termPhonetic": "IPA",
     "mainTranslation": "primary",
-    "sourceLevel": "B2",
-    "targetLevel": "B1",
-    "alternatives": ["synonym1", "synonym2"],
-    "sourceSynonyms": ["synonym1", "synonym2"],
+    "sourceLevel": "A1-C2",
+    "alternatives": ["syn1", "syn2"],
+    "sourceSynonyms": ["syn1", "syn2"],
     "grammar": {
       "partOfSpeech": "NOUN",
       "gender": "m",
-      "plural": "plural_form",
-      "notes": "Usage note here"
+      "plural": "form",
+      "notes": "Linguistic note"
     },
-    "examples": [{"text": "...", "translation": "...", "sourceTitle": "NEWSPAPER", "sourceType": "general"}]
+    "examples": [{"text": "...", "translation": "...", "sourceTitle": "..."}]
   }`;
 
   const response = await ai.models.generateContent({
@@ -45,15 +38,12 @@ export const translateWithGemini = async (
     contents: prompt,
     config: {
       responseMimeType: "application/json",
-      thinkingConfig: { thinkingBudget: 0 },
       responseSchema: {
         type: Type.OBJECT,
         properties: {
           term: { type: Type.STRING },
-          termPhonetic: { type: Type.STRING },
           mainTranslation: { type: Type.STRING },
           sourceLevel: { type: Type.STRING },
-          targetLevel: { type: Type.STRING },
           alternatives: { type: Type.ARRAY, items: { type: Type.STRING } },
           sourceSynonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
           grammar: {
@@ -73,14 +63,12 @@ export const translateWithGemini = async (
               properties: {
                 text: { type: Type.STRING },
                 translation: { type: Type.STRING },
-                sourceTitle: { type: Type.STRING },
-                sourceType: { type: Type.STRING }
-              },
-              required: ["text", "translation", "sourceTitle"]
+                sourceTitle: { type: Type.STRING }
+              }
             }
           }
         },
-        required: ["term", "mainTranslation", "examples", "grammar"]
+        required: ["term", "mainTranslation", "grammar", "examples"]
       }
     }
   });
@@ -90,12 +78,20 @@ export const translateWithGemini = async (
 
 export const generateQuizFromHistory = async (history: HistoryItem[]): Promise<QuizQuestion[]> => {
   const uniqueHistory = Array.from(new Map(history.map(item => [item.term.toLowerCase(), item])).values());
-  const termsData = uniqueHistory.slice(0, 15).map(h => 
-    `{ Term: "${h.term}", Translation: "${h.translation || 'unknown'}", From: "${LANGUAGE_NAMES[h.sourceLang]}", To: "${LANGUAGE_NAMES[h.targetLang]}" }`
+  const selectedEntries = uniqueHistory.slice(0, 15);
+  const termsData = selectedEntries.map(h => 
+    `{ "word": "${h.term}", "translation": "${h.translation || '?'}", "id": "${h.id}" }`
   ).join(', ');
   
-  const prompt = `STRICT RULE: Create a 5-question quiz based ONLY on these entries: [${termsData}].
-  Return a JSON array of objects with question, options, correctAnswer, explanation, and wordId.`;
+  const prompt = `ARENA GENERATOR: Create exactly 5 quiz questions from this list: [${termsData}].
+  
+  CRITICAL DIVERSITY RULES:
+  1. MAX 2 QUESTIONS PER WORD: Never ask more than 2 questions about the same word ID.
+  2. MIN 3 UNIQUE WORDS: You MUST use at least 3 different words from the list to construct these 5 questions.
+  3. Format: Multiple choice with 4 options.
+  
+  Return JSON array:
+  [{ "question": "...", "options": ["...", "...", "...", "..."], "correctAnswer": "...", "explanation": "...", "wordId": "..." }]`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -112,8 +108,7 @@ export const generateQuizFromHistory = async (history: HistoryItem[]): Promise<Q
             correctAnswer: { type: Type.STRING },
             explanation: { type: Type.STRING },
             wordId: { type: Type.STRING }
-          },
-          required: ["question", "options", "correctAnswer", "explanation", "wordId"]
+          }
         }
       }
     }
@@ -125,44 +120,31 @@ export const generateQuizFromHistory = async (history: HistoryItem[]): Promise<Q
 export const generateSpeech = async (text: string, lang: SupportedLanguage): Promise<string> => {
   const voiceMap: Record<string, string> = { de: 'Kore', uz: 'Zephyr', en: 'Puck', ru: 'Charon' };
   const voiceName = voiceMap[lang] || 'Zephyr';
-  
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Say this clearly: ${text}` }] }],
+    contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
     },
   });
-
   return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
 };
 
 function decode(base64: string) {
   const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
   return bytes;
 }
 
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
+async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
+    for (let i = 0; i < frameCount; i++) channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
   }
   return buffer;
 }

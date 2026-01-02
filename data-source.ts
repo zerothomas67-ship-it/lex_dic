@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "./entity/User";
 import { SearchHistory } from "./entity/SearchHistory";
+import { GlobalLexicon } from "./entity/GlobalLexicon";
 
 export const AppDataSource = new DataSource({
     type: "postgres",
@@ -13,7 +14,7 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME || "uzger_lexicon",
     synchronize: true, // Only for development
     logging: false,
-    entities: [User, SearchHistory],
+    entities: [User, SearchHistory, GlobalLexicon],
     migrations: [],
     subscribers: [],
 });
